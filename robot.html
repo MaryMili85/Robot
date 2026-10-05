@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Misión: Programa el Robot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #0b132b, #1c2541, #3a506b);
+            color: white;
+            flex-direction: column;
+        }
+        #game-container {
+            text-align: center;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+        h1 { margin-bottom: 5px; color: #4cc9f0; font-size: 2em; }
+        h2 { margin-top: 0; font-size: 1.2em; color: #e0e1dd; }
+        
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(5, 65px);
+            grid-template-rows: repeat(5, 65px);
+            gap: 4px;
+            background: #111827;
+            padding: 8px;
+            border-radius: 12px;
+            border: 2px solid #374151;
+            margin: 20px auto;
+            width: fit-content;
+            position: relative;
+        }
+        .cell {
+            background: #1f2937;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2em;
+            position: relative;
+        }
+        .obstacle { color: #ef4444; }
+        .star { animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #2563eb;
+            border: none;
+            color: white;
+            padding: 12px 18px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        button:hover { background: #3b82f6; transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
+        #clear-btn { background: #dc2626; }
+        #clear-btn:hover { background: #ef4444; }
+        #run-btn { background: #16a34a; }
+        #run-btn:hover { background: #22c55e; }
+
+        #sequence-display {
+            margin-top: 15px;
+            font-size: 1.8em;
+            min-height: 2em;
+            background: #111827;
+            padding: 10px;
+            border-radius: 8px;
+            letter-spacing: 5px;
+            border: 1px dashed #4b5563;
+        }
+        #status-display {
+            margin-top: 15px;
+            font-size: 1.3em;
+            min-height: 1.5em;
+            font-weight: bold;
+        }
+        .status-wrong { color: #f87171; animation: shake 0.4s; }
+        .status-correct { color: #4ade80; animation: popIn 0.5s; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1>🤖 MISIÓN: PROGRAMA EL ROBOT</h1>
+    <h2>El robot necesita llegar a ⭐</h2>
+
+    <div id="grid"></div>
+
+    <div id="sequence-display"></div>
+    <div id="status-display"></div>
+
+    <div id="controls">
+        <button onclick="addInstruction('➡️')">➡️ Derecha</button>
+        <button onclick="addInstruction('⬆️')">⬆️ Arriba</button>
+        <button onclick="addInstruction('⬇️')">⬇️ Abajo</button>
+        <button id="clear-btn" onclick="clearSequence()">❌ Borrar</button>
+        <button id="run-btn" onclick="runSequence()">🎉 Ejecutar</button>
+    </div>
+</div>
+
+<script>
+    const gridSize = 5;
+    const gridEl = document.getElementById('grid');
+    const statusEl = document.getElementById('status-display');
+    const sequenceEl = document.getElementById('sequence-display');
+
+    let startPos = { x: 0, y: 4 }; 
+    let goalPos = { x: 4, y: 0 };  
+    let currentPos = { ...startPos };
+    let sequence = [];
+    let isExecuting = false;
+
+    const obstacles = [
+        { x: 1, y: 3 },
+        { x: 2, y: 1 },
+        { x: 3, y: 3 }
+    ];
+
+    function init() {
+        gridEl.innerHTML = '';
+        currentPos = { ...startPos };
+        statusEl.innerHTML = '';
+        statusEl.className = '';
+        sequence = [];
+        sequenceEl.innerHTML = '<i>Instrucciones...</i>';
+        renderGrid();
+    }
+
+    function renderGrid() {
+        gridEl.innerHTML = '';
+        for (let y = 0; y < gridSize; y++) {
+            for (let x = 0; x < gridSize; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                
+                if (x === currentPos.x && y === currentPos.y) {
+                    cell.innerHTML = '🤖';
+                } else if (x === goalPos.x && y === goalPos.y) {
+                    cell.innerHTML = '<span class="star">⭐</span>';
+                } else if (obstacles.some(ob => ob.x === x && ob.y === y)) {
+                    cell.innerHTML = '<span class="obstacle">❌</span>';
+                }
+
+                gridEl.appendChild(cell);
+            }
+        }
+    }
+
+    function addInstruction(direction) {
+        if (isExecuting) return;
+        if (sequence.length === 0) sequenceEl.innerHTML = '';
+        sequence.push(direction);
+        sequenceEl.innerHTML = sequence.join(' ');
+        statusEl.innerHTML = '';
+    }
+
+    function clearSequence() {
+        if (isExecuting) return;
+        init();
+    }
+
+    async function runSequence() {
+        if (isExecuting || sequence.length === 0) return;
+        isExecuting = true;
+        currentPos = { ...startPos };
+        renderGrid();
+
+        for (let i = 0; i < sequence.length; i++) {
+            let move = sequence[i];
+            await new Promise(r => setTimeout(r, 400));
+
+            if (move === '➡️') currentPos.x = Math.min(gridSize - 1, currentPos.x + 1);
+            if (move === '⬆️') currentPos.y = Math.max(0, currentPos.y - 1);
+            if (move === '⬇️') currentPos.y = Math.min(gridSize - 1, currentPos.y + 1);
+
+            renderGrid();
+
+            if (obstacles.some(ob => ob.x === currentPos.x && ob.y === currentPos.y)) {
+                statusEl.innerHTML = "❌ ¡El robot chocó!";
+                statusEl.className = 'status-wrong';
+                isExecuting = false;
+                return;
+            }
+        }
+
+        if (currentPos.x === goalPos.x && currentPos.y === goalPos.y) {
+            statusEl.innerHTML = "🎉 ¡PROGRAMA CORRECTO!<br><b>“Acabas de crear un algoritmo.”</b>";
+            statusEl.className = 'status-correct';
+        } else {
+            statusEl.innerHTML = "❌ Misión fallida: No llegaste a la ⭐";
+            statusEl.className = 'status-wrong';
+        }
+
+        isExecuting = false;
+    }
+
+    init();
+</script>
+
+</body>
+</html>
